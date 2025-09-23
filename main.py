@@ -19,6 +19,7 @@ archivo_transacciones_csv = Path("Archivos/transactions.csv")
 ### ---------- Nombres de tablas en SQLite ---------- ###
 name_tabla_registros_excel = "tabla_registros"
 name_tabla_transacciones_csv = "tabla_transacciones"
+name_tabla_resultados = 'cruce_registros_transacciones'
 
 ### ---------- Archivo base de datos ---------- ###
 archivo_base_datos = Path("Archivos/Archivos_base_datos/DataBase_aciertala.db")
@@ -46,6 +47,11 @@ def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
     - conn: conexión a la BD
     - unique_cols: lista de columnas que actúan como clave compuesta
     """
+
+    # 🔹 Convertir todas las columnas datetime a texto seguro YYYY-MM-DD HH:MM:SS
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]) or df[col].apply(lambda x: isinstance(x, pd.Timestamp)).any():
+           df[col] = pd.to_datetime(df[col], errors="coerce").dt.strftime("%Y-%m-%d")
 
     # Crear tabla si no existe
     df.head(0).to_sql(nombre_tabla, conn, if_exists="append", index=False)
@@ -79,10 +85,9 @@ def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
 
     print(unique_cols)
 
+
 ### ---------- Leer Excel ---------- ###
 df_registros_excel = pd.read_excel(archivo_registros_excel, sheet_name='Historico')
-
-
 
 df_transacciones_csv = pd.read_csv(
     archivo_transacciones_csv,
@@ -96,6 +101,10 @@ df_transacciones_csv.columns = (
     .str.strip()
     .str.replace('"', '', regex=False)
 )
+df_transacciones_csv[fecha_deposito_csv] = df_transacciones_csv[fecha_deposito_csv].str.split(' ').str[0]
+
+df_transacciones_csv[fecha_deposito_csv] = pd.to_datetime(df_transacciones_csv[fecha_deposito_csv]).dt.strftime('%Y-%m-%d')
+df_registros_excel[fecha_creacion_excel] = pd.to_datetime(df_registros_excel[fecha_creacion_excel]).dt.strftime('%Y-%m-%d')
 
 print("📌 Columnas del CSV limpio:")
 print(df_transacciones_csv.columns.tolist())
@@ -107,20 +116,18 @@ print(df_registros_excel.columns.tolist())
 col_necesarias_csv = [fecha_deposito_csv, ID_usuario_csv, usuario_csv, tipo_transaccion_csv, ID_transaccion_csv]
 df_final_transacciones = df_transacciones_csv[col_necesarias_csv]
 
-# Normalizar fechas a string YYYY-MM-DD en CSV
 df_final_transacciones.loc[:, fecha_deposito_csv] = pd.to_datetime(
     df_final_transacciones[fecha_deposito_csv], errors="coerce"
-).dt.strftime("%Y-%m-%d").astype(str)
+).dt.normalize()
 
 ### ---------- Filtrar columnas necesarias excel ---------- ###
 col_necesarias_excel = [fecha_creacion_excel, ID_usuario_excel, Usuario_excel]
 df_final_registros = df_registros_excel[col_necesarias_excel]
 
-# Normalizar fechas a string YYYY-MM-DD en Excel
+# Por esta línea
 df_final_registros.loc[:, fecha_creacion_excel] = pd.to_datetime(
     df_final_registros[fecha_creacion_excel], errors="coerce"
-).dt.strftime("%Y-%m-%d").astype(str)
-
+).dt.normalize()
 
 print("📌 Vista previa columnas necesarias:")
 print(df_final_transacciones.head())
@@ -143,67 +150,84 @@ print("dtype:", df_final_transacciones[fecha_deposito_csv].dtype)
 
 print(df_final_transacciones[ID_transaccion_csv].head(10))
 
-# --- Identificar primeros depósitos ---
+# --- 1) Copias seguras ---
+reg = df_final_registros.copy()
+txn = df_final_transacciones.copy()
 
-# Filtrar depósitos
-df_depositos = df_final_transacciones[
-    df_final_transacciones[tipo_transaccion_csv].str.lower() == "deposit"
-].copy()
+# --- 2) Normalizar Usuario (trim + lower) ---
+reg.loc[:, Usuario_excel] = reg[Usuario_excel].fillna("").astype(str).str.strip().str.lower()
+txn.loc[:, usuario_csv] = txn[usuario_csv].fillna("").astype(str).str.strip().str.lower()
 
-# Asegurar que la fecha es datetime
-df_depositos[fecha_deposito_csv] = pd.to_datetime(df_depositos[fecha_deposito_csv], errors="coerce")
+# --- 3) Asegurar tipos de fechas ---
+txn.loc[:, fecha_deposito_csv] = pd.to_datetime(txn[fecha_deposito_csv], errors="coerce").dt.normalize()
+reg.loc[:, fecha_creacion_excel] = pd.to_datetime(reg[fecha_creacion_excel], errors="coerce").dt.normalize()
 
-# Ordenar por usuario y fecha
-df_depositos = df_depositos.sort_values(by=[usuario_csv, fecha_deposito_csv])
+# --- 4) Filtrar SOLO depósitos ---
+mask_deposit = txn[tipo_transaccion_csv].fillna("").astype(str).str.lower().str.contains("deposit")
+txn_deposits = txn.loc[mask_deposit, [usuario_csv, fecha_deposito_csv, ID_transaccion_csv]].copy()
+txn_deposits = txn_deposits[txn_deposits[usuario_csv] != ""]
 
-# Obtener el primer depósito por usuario
-df_primer_deposito = df_depositos.groupby(usuario_csv).first().reset_index()
+# --- 5) Obtener primer depósito ---
+idx = txn_deposits.groupby(usuario_csv)[fecha_deposito_csv].idxmin().dropna()
+first_deposits = txn_deposits.loc[idx].reset_index(drop=True)
 
-# Normalizar nombres de usuario para que coincidan
-df_final_registros[Usuario_excel] = (
-    df_final_registros[Usuario_excel].astype(str).str.strip().str.lower()
-)
-df_final_transacciones[usuario_csv] = (
-    df_final_transacciones[usuario_csv].astype(str).str.strip().str.lower()
-)
+print("ℹ️ Usuarios únicos en registros:", reg[Usuario_excel].nunique())
+print("ℹ️ Usuarios con depósitos (txns):", first_deposits[usuario_csv].nunique())
+print("ℹ️ Ejemplo primeros depósitos (primeras 10):")
+print(first_deposits.head(10))
 
-# --- Primer depósito por usuario en transacciones ---
-df_primer_deposito = (
-    df_final_transacciones
-    .sort_values(by=fecha_deposito_csv)
-    .groupby([ID_usuario_csv, usuario_csv], as_index=False)
-    .first()[[ID_usuario_csv, usuario_csv, fecha_deposito_csv, ID_transaccion_csv]]
-)
-
-# --- Cruce por ID de usuario ---
-df_merge_id = pd.merge(
-    df_final_registros.dropna(subset=[ID_usuario_excel]),
-    df_primer_deposito,
-    how="left",
-    left_on=ID_usuario_excel,
-    right_on=ID_usuario_csv
-)
-
-# --- Cruce por Usuario (para los que tienen ID NaN) ---
-df_merge_user = pd.merge(
-    df_final_registros[df_final_registros[ID_usuario_excel].isna()],
-    df_primer_deposito,
-    how="left",
+# --- 6) Merge LEFT registros vs primeros depósitos ---
+df_resultado = reg.merge(
+    first_deposits[[usuario_csv, fecha_deposito_csv, ID_transaccion_csv]],
     left_on=Usuario_excel,
-    right_on=usuario_csv
+    right_on=usuario_csv,
+    how="left",
+    suffixes=("", "_txn")
 )
 
-# --- Unir ambos resultados ---
-df_resultado = pd.concat([df_merge_id, df_merge_user], ignore_index=True)
+# --- 7) Rellenar usuario si hace falta ---
+df_resultado[Usuario_excel] = df_resultado[Usuario_excel].fillna(df_resultado[usuario_csv])
 
-# --- Renombrar columnas ---
+# --- 8) Renombrar columnas finales ---
 df_resultado = df_resultado.rename(columns={
     fecha_creacion_excel: "Fecha de registro",
     fecha_deposito_csv: "Fecha primer depósito",
     ID_transaccion_csv: "ID primer depósito"
-})[
-    ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha primer depósito", "ID primer depósito"]
-]
+})
 
-print("📊 Vista previa de primeros depósitos encontrados:")
-print(df_resultado.head(20))
+final_cols = ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha primer depósito", "ID primer depósito"]
+final_cols = [c for c in final_cols if c in df_resultado.columns]
+
+# --- 9) Convertir fechas a string antes de guardar ---
+if "Fecha de registro" in df_resultado.columns:
+    df_resultado["Fecha de registro"] = pd.to_datetime(
+        df_resultado["Fecha de registro"], errors="coerce"
+    ).dt.strftime("%Y-%m-%d")
+
+if "Fecha primer depósito" in df_resultado.columns:
+    df_resultado["Fecha primer depósito"] = pd.to_datetime(
+        df_resultado["Fecha primer depósito"], errors="coerce"
+    ).dt.strftime("%Y-%m-%d")
+
+# --- 10) Guardar en SQLite ---
+def guardar_en_sqlite(df, nombre_tabla, archivo_db, if_exists="append"):
+    conn = sqlite3.connect(archivo_db)
+
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime("%Y-%m-%d")
+        if df[col].dtype == "object":
+            df[col] = df[col].astype(str)
+        elif pd.api.types.is_integer_dtype(df[col]):
+            df[col] = df[col].astype(int)
+        elif pd.api.types.is_float_dtype(df[col]):
+            df[col] = df[col].astype(float)
+
+    df.to_sql(nombre_tabla, conn, if_exists=if_exists, index=False)
+    conn.close()
+
+guardar_en_sqlite(df_resultado, name_tabla_resultados, archivo_base_datos)
+
+
+
+
