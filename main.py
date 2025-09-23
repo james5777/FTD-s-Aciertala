@@ -77,6 +77,8 @@ def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
     else:
         print(f"ℹ️ No hay filas nuevas en {nombre_tabla}")
 
+    print(unique_cols)
+
 ### ---------- Leer Excel ---------- ###
 df_registros_excel = pd.read_excel(archivo_registros_excel, sheet_name='Historico')
 
@@ -126,7 +128,7 @@ print(df_final_registros.head())
 
 ### ---------- Actualizar tablas en SQLite ---------- ###
 actualizar_tabla(df_final_registros, name_tabla_registros_excel, conn, unique_cols=[Usuario_excel])
-actualizar_tabla(df_final_transacciones, name_tabla_transacciones_csv, conn, unique_cols=[usuario_csv])
+actualizar_tabla(df_final_transacciones, name_tabla_transacciones_csv, conn, unique_cols=[usuario_csv, fecha_deposito_csv])
 
 ### ---------- Cerrar conexión con SQLite ---------- ###
 conn.close()
@@ -138,3 +140,70 @@ print("dtype:", df_final_registros[fecha_creacion_excel].dtype)
 print("\n📌 DEBUG FECHAS - Transacciones (CSV)")
 print(df_final_transacciones[fecha_deposito_csv].head(10))
 print("dtype:", df_final_transacciones[fecha_deposito_csv].dtype)
+
+print(df_final_transacciones[ID_transaccion_csv].head(10))
+
+# --- Identificar primeros depósitos ---
+
+# Filtrar depósitos
+df_depositos = df_final_transacciones[
+    df_final_transacciones[tipo_transaccion_csv].str.lower() == "deposit"
+].copy()
+
+# Asegurar que la fecha es datetime
+df_depositos[fecha_deposito_csv] = pd.to_datetime(df_depositos[fecha_deposito_csv], errors="coerce")
+
+# Ordenar por usuario y fecha
+df_depositos = df_depositos.sort_values(by=[usuario_csv, fecha_deposito_csv])
+
+# Obtener el primer depósito por usuario
+df_primer_deposito = df_depositos.groupby(usuario_csv).first().reset_index()
+
+# Normalizar nombres de usuario para que coincidan
+df_final_registros[Usuario_excel] = (
+    df_final_registros[Usuario_excel].astype(str).str.strip().str.lower()
+)
+df_final_transacciones[usuario_csv] = (
+    df_final_transacciones[usuario_csv].astype(str).str.strip().str.lower()
+)
+
+# --- Primer depósito por usuario en transacciones ---
+df_primer_deposito = (
+    df_final_transacciones
+    .sort_values(by=fecha_deposito_csv)
+    .groupby([ID_usuario_csv, usuario_csv], as_index=False)
+    .first()[[ID_usuario_csv, usuario_csv, fecha_deposito_csv, ID_transaccion_csv]]
+)
+
+# --- Cruce por ID de usuario ---
+df_merge_id = pd.merge(
+    df_final_registros.dropna(subset=[ID_usuario_excel]),
+    df_primer_deposito,
+    how="left",
+    left_on=ID_usuario_excel,
+    right_on=ID_usuario_csv
+)
+
+# --- Cruce por Usuario (para los que tienen ID NaN) ---
+df_merge_user = pd.merge(
+    df_final_registros[df_final_registros[ID_usuario_excel].isna()],
+    df_primer_deposito,
+    how="left",
+    left_on=Usuario_excel,
+    right_on=usuario_csv
+)
+
+# --- Unir ambos resultados ---
+df_resultado = pd.concat([df_merge_id, df_merge_user], ignore_index=True)
+
+# --- Renombrar columnas ---
+df_resultado = df_resultado.rename(columns={
+    fecha_creacion_excel: "Fecha de registro",
+    fecha_deposito_csv: "Fecha primer depósito",
+    ID_transaccion_csv: "ID primer depósito"
+})[
+    ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha primer depósito", "ID primer depósito"]
+]
+
+print("📊 Vista previa de primeros depósitos encontrados:")
+print(df_resultado.head(20))
