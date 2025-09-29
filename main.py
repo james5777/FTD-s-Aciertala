@@ -54,72 +54,72 @@ conn = sqlite3.connect(archivo_base_datos)
 ### ---------- Esta funcion se encarga de insertar la nueva data tanto de registros como de transacciones ---------- ###
 ### ---------- Importante tener en cuenta que para el excel, no es necesario subir solamente los nuevos registros ya que cuando, subimos el archivo, la funcion detecta por medio del usuario cuales datos estan duplicados y los omite, para los csv de transacciones si es necesario, seleccionar las fechas nuevas. en el sportbook seleccionar siempre la opcion "Ayer" exportarlo y subirlo ---------- ###
 
-def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
-    """
-    Inserta solo filas nuevas en una tabla SQLite desde un DataFrame.
-    """
+# def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
+#     """
+#     Inserta solo filas nuevas en una tabla SQLite desde un DataFrame.
+#     """
 
-    df_copy = df.copy() 
+#     df_copy = df.copy() 
     
-    # Convertir todas las columnas datetime a texto YYYY-MM-DD
-    for col in df_copy.columns:
-        if pd.api.types.is_datetime64_any_dtype(df_copy[col]) or df_copy[col].apply(lambda x: isinstance(x, pd.Timestamp)).any():
-            df_copy.loc[:, col] = pd.to_datetime(df_copy[col], errors="coerce").dt.strftime("%Y-%m-%d")
+#     # Convertir todas las columnas datetime a texto YYYY-MM-DD
+#     for col in df_copy.columns:
+#         if pd.api.types.is_datetime64_any_dtype(df_copy[col]) or df_copy[col].apply(lambda x: isinstance(x, pd.Timestamp)).any():
+#             df_copy.loc[:, col] = pd.to_datetime(df_copy[col], errors="coerce").dt.strftime("%Y-%m-%d")
 
-    df_copy.head(0).to_sql(nombre_tabla, conn, if_exists="append", index=False)
+#     df_copy.head(0).to_sql(nombre_tabla, conn, if_exists="append", index=False)
     
-    try:
-        existentes = pd.read_sql(f"SELECT {', '.join(unique_cols)} FROM {nombre_tabla}", conn)
-    except Exception:
-        existentes = pd.DataFrame(columns=unique_cols)
+#     try:
+#         existentes = pd.read_sql(f"SELECT {', '.join(unique_cols)} FROM {nombre_tabla}", conn)
+#     except Exception:
+#         existentes = pd.DataFrame(columns=unique_cols)
     
-    # Resto del código...
-    df_copy["_hash"] = df_copy[unique_cols].astype(str).agg("-".join, axis=1).astype(str)
-    if not existentes.empty:
-        existentes["_hash"] = existentes[unique_cols].astype(str).agg("-".join, axis=1).astype(str)
-    else:
-        existentes["_hash"] = []
+#     # Resto del código...
+#     df_copy["_hash"] = df_copy[unique_cols].astype(str).agg("-".join, axis=1).astype(str)
+#     if not existentes.empty:
+#         existentes["_hash"] = existentes[unique_cols].astype(str).agg("-".join, axis=1).astype(str)
+#     else:
+#         existentes["_hash"] = []
 
-    nuevos = df_copy[~df_copy["_hash"].isin(existentes["_hash"])].drop(columns=["_hash"])
+#     nuevos = df_copy[~df_copy["_hash"].isin(existentes["_hash"])].drop(columns=["_hash"])
 
-    if not nuevos.empty:
-        nuevos.to_sql(nombre_tabla, conn, if_exists="append", index=False)
-        print(f"✅ {len(nuevos)} filas nuevas insertadas en {nombre_tabla}")
-    else:
-        print(f"ℹ️ No hay filas nuevas en {nombre_tabla}")
+#     if not nuevos.empty:
+#         nuevos.to_sql(nombre_tabla, conn, if_exists="append", index=False)
+#         print(f"✅ {len(nuevos)} filas nuevas insertadas en {nombre_tabla}")
+#     else:
+#         print(f"ℹ️ No hay filas nuevas en {nombre_tabla}")
     
-    print(unique_cols)
+#     print(unique_cols)
 
-### ---------- Leer Excel y CSV ---------- ###
-df_registros_excel = pd.read_excel(archivo_registros_excel, sheet_name='Historico')
-df_transacciones_csv = pd.read_csv(
-    archivo_transacciones_csv,
-    sep=",",
-    quotechar='"',
-    encoding="utf-8"
-)
+# ### ---------- Leer Excel y CSV ---------- ###
+# df_registros_excel = pd.read_excel(archivo_registros_excel, sheet_name='Historico')
+# df_transacciones_csv = pd.read_csv(
+#     archivo_transacciones_csv,
+#     sep=",",
+#     quotechar='"',
+#     encoding="utf-8"
+# )
 
-### ---------- Normalizacion de columnas por fecha y por separadores de columnas ---------- ###
-df_transacciones_csv.columns = df_transacciones_csv.columns.str.strip().str.replace('"', '', regex=False)
-df_transacciones_csv[fecha_deposito_csv] = df_transacciones_csv[fecha_deposito_csv].str.split(' ').str[0]
-df_transacciones_csv[fecha_deposito_csv] = pd.to_datetime(df_transacciones_csv[fecha_deposito_csv]).dt.strftime('%Y-%m-%d')
-df_registros_excel[fecha_creacion_excel] = pd.to_datetime(df_registros_excel[fecha_creacion_excel]).dt.strftime('%Y-%m-%d')
+# ### ---------- Normalizacion de columnas por fecha y por separadores de columnas ---------- ###
+# df_transacciones_csv.columns = df_transacciones_csv.columns.str.strip().str.replace('"', '', regex=False)
+# df_transacciones_csv[fecha_deposito_csv] = df_transacciones_csv[fecha_deposito_csv].str.split(' ').str[0]
+# df_transacciones_csv[fecha_deposito_csv] = pd.to_datetime(df_transacciones_csv[fecha_deposito_csv]).dt.strftime('%Y-%m-%d')
+# df_registros_excel[fecha_creacion_excel] = pd.to_datetime(df_registros_excel[fecha_creacion_excel]).dt.strftime('%Y-%m-%d')
 
-### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el csv de transacciones y se normaliza a fecha sin hora ---------- ###
-col_necesarias_csv = [fecha_deposito_csv, ID_usuario_csv, usuario_csv, tipo_transaccion_csv, ID_transaccion_csv]
-df_final_transacciones = df_transacciones_csv[col_necesarias_csv]
-df_final_transacciones.loc[:, fecha_deposito_csv] = pd.to_datetime(df_final_transacciones[fecha_deposito_csv], errors="coerce").dt.normalize()
+# ### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el csv de transacciones y se normaliza a fecha sin hora ---------- ###
+# col_necesarias_csv = [fecha_deposito_csv, ID_usuario_csv, usuario_csv, tipo_transaccion_csv, ID_transaccion_csv]
+# df_final_transacciones = df_transacciones_csv[col_necesarias_csv]
+# df_final_transacciones.loc[:, fecha_deposito_csv] = pd.to_datetime(df_final_transacciones[fecha_deposito_csv], errors="coerce").dt.normalize()
 
-### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el excel de registros y se normaliza a fecha sin hora ---------- ###
-col_necesarias_excel = [fecha_creacion_excel, ID_usuario_excel, Usuario_excel]
-df_final_registros = df_registros_excel[col_necesarias_excel]
-df_final_registros.loc[:, fecha_creacion_excel] = pd.to_datetime(df_final_registros[fecha_creacion_excel], errors="coerce").dt.normalize()
+# ### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el excel de registros y se normaliza a fecha sin hora ---------- ###
+# col_necesarias_excel = [fecha_creacion_excel, ID_usuario_excel, Usuario_excel]
+# df_final_registros = df_registros_excel[col_necesarias_excel]
+# df_final_registros.loc[:, fecha_creacion_excel] = pd.to_datetime(df_final_registros[fecha_creacion_excel], errors="coerce").dt.normalize()
 
-### ---------- Actualizar tablas de registros y transacciones ---------- ###
-actualizar_tabla(df_final_registros, name_tabla_registros_excel, conn, unique_cols=[Usuario_excel])
-actualizar_tabla(df_final_transacciones, name_tabla_transacciones_csv, conn, unique_cols=[usuario_csv, fecha_deposito_csv, ID_transaccion_csv])
+# ### ---------- Actualizar tablas de registros y transacciones ---------- ###
+# actualizar_tabla(df_final_registros, name_tabla_registros_excel, conn, unique_cols=[Usuario_excel])
+# # actualizar_tabla(df_final_transacciones, name_tabla_transacciones_csv, conn, unique_cols=[usuario_csv, fecha_deposito_csv, ID_transaccion_csv])
 
-print("📌 Tablas intermedias actualizadas. Ahora se realizará el cruce final.")
+# print("📌 Tablas intermedias actualizadas. Ahora se realizará el cruce final.")
 
 ######################################################################################################################################
 #####################################---------------FIN DE BLOQUE PARA COMENTAR---------------########################################
@@ -161,6 +161,7 @@ df_resultado = df_resultado.rename(columns={
     fecha_deposito_csv: "Fecha primer depósito",
     ID_transaccion_csv: "ID primer depósito"
 })
+
 final_cols = ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha primer depósito", "ID primer depósito"]
 final_cols = [c for c in final_cols if c in df_resultado.columns]
 df_resultado = df_resultado[final_cols]
@@ -225,7 +226,6 @@ def crear_tabla_resumen(conn, name_tabla_resumen):
     print("\n📌 Vista previa de la tabla de resumen:")
     print(df_resumen.head())
 
-
 # Llamada a la nueva función para crear la tabla de resumen
 crear_tabla_resumen(conn, name_tabla_resumen)
 
@@ -254,6 +254,9 @@ def exportar_a_excel(conn, tablas_a_exportar, archivo_excel_salida):
         for col in df.columns:
             if 'ID' in col or 'id' in col:
                 df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True)
+
+        df = df.replace('nan', '', regex=True)
+        df = df.fillna('')
         
         # Crea una nueva hoja con el nombre de la tabla
         ws = wb.create_sheet(nombre_tabla)
