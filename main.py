@@ -51,6 +51,9 @@ conn = sqlite3.connect(archivo_base_datos)
 ######################################################################################################################################
 #####----- En caso de necesitar actualizar algo en las tablas que se crean a partir de una consulta SQL, se comenta este bloque para que no se carguen mas datos a la base de datos (LO CUAL LA CORROMPERIA) -----#####
 
+### ---------- Esta funcion se encarga de insertar la nueva data tanto de registros como de transacciones ---------- ###
+### ---------- Importante tener en cuenta que para el excel, no es necesario subir solamente los nuevos registros ya que cuando, subimos el archivo, la funcion detecta por medio del usuario cuales datos estan duplicados y los omite, para los csv de transacciones si es necesario, seleccionar las fechas nuevas. en el sportbook seleccionar siempre la opcion "Ayer" exportarlo y subirlo ---------- ###
+
 def actualizar_tabla(df, nombre_tabla, conn, unique_cols):
     """
     Inserta solo filas nuevas en una tabla SQLite desde un DataFrame.
@@ -96,16 +99,18 @@ df_transacciones_csv = pd.read_csv(
     encoding="utf-8"
 )
 
+### ---------- Normalizacion de columnas por fecha y por separadores de columnas ---------- ###
 df_transacciones_csv.columns = df_transacciones_csv.columns.str.strip().str.replace('"', '', regex=False)
 df_transacciones_csv[fecha_deposito_csv] = df_transacciones_csv[fecha_deposito_csv].str.split(' ').str[0]
 df_transacciones_csv[fecha_deposito_csv] = pd.to_datetime(df_transacciones_csv[fecha_deposito_csv]).dt.strftime('%Y-%m-%d')
 df_registros_excel[fecha_creacion_excel] = pd.to_datetime(df_registros_excel[fecha_creacion_excel]).dt.strftime('%Y-%m-%d')
 
-### ---------- Filtrar y estandarizar columnas ---------- ###
+### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el csv de transacciones y se normaliza a fecha sin hora ---------- ###
 col_necesarias_csv = [fecha_deposito_csv, ID_usuario_csv, usuario_csv, tipo_transaccion_csv, ID_transaccion_csv]
 df_final_transacciones = df_transacciones_csv[col_necesarias_csv]
 df_final_transacciones.loc[:, fecha_deposito_csv] = pd.to_datetime(df_final_transacciones[fecha_deposito_csv], errors="coerce").dt.normalize()
 
+### ---------- Se crea un nuevo dataframe unicamente con las columnas necesarias para el excel de registros y se normaliza a fecha sin hora ---------- ###
 col_necesarias_excel = [fecha_creacion_excel, ID_usuario_excel, Usuario_excel]
 df_final_registros = df_registros_excel[col_necesarias_excel]
 df_final_registros.loc[:, fecha_creacion_excel] = pd.to_datetime(df_final_registros[fecha_creacion_excel], errors="coerce").dt.normalize()
@@ -120,7 +125,7 @@ print("📌 Tablas intermedias actualizadas. Ahora se realizará el cruce final.
 #####################################---------------FIN DE BLOQUE PARA COMENTAR---------------########################################
 ######################################################################################################################################
 
-# ### ---------- Lógica principal de cruce con datos de la BD ---------- ###
+# ### ---------- Cruce con datos de la BD ---------- ###
 
 # Leer los datos completos desde las tablas de la BD
 reg = pd.read_sql(f"SELECT * FROM {name_tabla_registros_excel}", conn)
@@ -192,8 +197,6 @@ guardar_en_sqlite(df_resultado, name_tabla_resultados, archivo_base_datos, if_ex
 
 print("\n🚀 El proceso ha finalizado correctamente. La tabla de resultados está actualizada.")
 
-### ---------- NUEVO CÓDIGO AÑADIDO ---------- ###
-### ---------- NUEVO CÓDIGO AÑADIDO ---------- ###
 def crear_tabla_resumen(conn, name_tabla_resumen):
     """
     Crea una tabla de resumen diario a partir de las tablas de registros y cruce existentes.
