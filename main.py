@@ -165,7 +165,7 @@ final_cols = ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha prime
 final_cols = [c for c in final_cols if c in df_resultado.columns]
 df_resultado = df_resultado[final_cols]
 
-# Asegurar que las fechas estén en el formato correcto para guardar
+# Asegurar que las fechas estén en el formato correcto para guardar en SQLite
 if "Fecha de registro" in df_resultado.columns:
     df_resultado["Fecha de registro"] = pd.to_datetime(df_resultado["Fecha de registro"], errors="coerce").dt.strftime("%Y-%m-%d")
 if "Fecha primer depósito" in df_resultado.columns:
@@ -193,10 +193,11 @@ def guardar_en_sqlite(df, nombre_tabla, archivo_db, if_exists="replace"):
     print(f"✅ Tabla de resultados '{nombre_tabla}' actualizada con éxito.")
     conn.close()
 
+### ---------- Llamada a la funcion para guardar en SQLite ---------- ###
 guardar_en_sqlite(df_resultado, name_tabla_resultados, archivo_base_datos, if_exists="replace")
-
 print("\n🚀 El proceso ha finalizado correctamente. La tabla de resultados está actualizada.")
 
+### ---------- Funcion para crear la tabla de resumen diario de registros y FTD's ---------- ###
 def crear_tabla_resumen(conn, name_tabla_resumen):
     """
     Crea una tabla de resumen diario a partir de las tablas de registros y cruce existentes.
@@ -224,15 +225,12 @@ def crear_tabla_resumen(conn, name_tabla_resumen):
     print("\n📌 Vista previa de la tabla de resumen:")
     print(df_resumen.head())
 
-# Llamada a la nueva función para crear la tabla de resumen
-crear_tabla_resumen(conn, name_tabla_resumen)
-
 
 # Llamada a la nueva función para crear la tabla de resumen
 crear_tabla_resumen(conn, name_tabla_resumen)
 
-### ---------- Lógica para exportar a Excel con estilos ---------- ###
-def exportar_a_excel_con_estilo(conn, tablas_a_exportar, archivo_excel_salida):
+### ---------- Logica para exportar la tabla resumen a un archivo excel ---------- ###
+def exportar_a_excel(conn, tablas_a_exportar, archivo_excel_salida):
     """
     Exporta múltiples tablas de la base de datos a un solo archivo de Excel,
     aplicando un estilo de tabla automático a cada hoja.
@@ -287,7 +285,7 @@ def exportar_a_excel_con_estilo(conn, tablas_a_exportar, archivo_excel_salida):
 
 # Llama a la nueva función
 tablas_a_exportar = [name_tabla_resultados, name_tabla_resumen]
-exportar_a_excel_con_estilo(conn, tablas_a_exportar, "Reporte_Diario_Aciertala.xlsx")
+exportar_a_excel(conn, tablas_a_exportar, "Reporte_Diario_Aciertala.xlsx")
 
 # Y mueve esta línea al final del script, después de todo
 conn.close()
