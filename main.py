@@ -288,7 +288,7 @@ def exportar_a_excel(conn, tablas_a_exportar, archivo_excel_salida):
 
 # Llama a la nueva función
 tablas_a_exportar = [name_tabla_resultados, name_tabla_resumen]
-exportar_a_excel(conn, tablas_a_exportar, "Reporte_Diario_Aciertala.xlsx")
+exportar_a_excel(conn, tablas_a_exportar, "Algoritmo_ftd_aciertala_peru.xlsx")
 
 # Y mueve esta línea al final del script, después de todo
 conn.close()
