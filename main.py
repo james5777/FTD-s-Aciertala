@@ -17,8 +17,9 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
 
+
 ### ---------- Archivos a leer ---------- ###
-archivo_registros_excel = Path("Archivos/Diario-ACPE.xlsm")
+archivo_registros_excel = Path("Archivos/Diario-ACPE.xlsx")
 archivo_transacciones_csv = Path("Archivos/transactions.csv")
 
 ### ---------- Nombres de tablas en SQLite ---------- ###
