@@ -44,7 +44,7 @@ def reporte_diario_aciertala():
     tipo_transaccion_csv = 'Tipo de transacción'
     ID_transaccion_csv = 'ID de transacción'
 
-    
+
 
     ### ---------- Conexión a SQLite ---------- ###
     conn = sqlite3.connect(archivo_base_datos)
@@ -299,4 +299,4 @@ def reporte_diario_aciertala():
 
 if __name__ == "__main__":
     ad.data_auto_descarga()
-    # reporte_diario_aciertala()
+    reporte_diario_aciertala()
