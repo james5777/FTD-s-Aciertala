@@ -17,8 +17,8 @@ def data_auto_descarga():
 
     # === 📅 CONFIGURACIÓN DE FECHAS ===
     # Puedes editar estas variables para ajustar el rango
-    FECHA_INICIO = "2025-10-01 00:00"
-    FECHA_FIN =    "2025-10-06 23:59"
+    FECHA_INICIO = "2025-01-01 00:00"
+    FECHA_FIN =    "2025-09-30 23:59"
 
     # Carpeta donde se descargará el CSV
     DOWNLOAD_DIR = os.path.join(os.getcwd(), "Archivos")
@@ -106,7 +106,7 @@ def data_auto_descarga():
             form = driver.find_element(By.XPATH, "//form[contains(@action, 'transactions-v2')]")
             driver.execute_script("arguments[0].submit();", form)
             print("✅ Filtro enviado (submit forzado).")
-            time.sleep(6)
+            time.sleep(40)
         except Exception as e:
             print(f"❌ Error al aplicar el filtro: {e}")
             driver.save_screenshot("error_filtro_submit.png")
@@ -123,7 +123,7 @@ def data_auto_descarga():
             print("✅ Clic en 'Exportar' realizado.")
 
             # Esperar a que se descargue el CSV
-            time.sleep(30)
+            time.sleep(100)
             archivos = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".csv")]
             if archivos:
                 print(f"✅ Archivo CSV detectado: {archivos[-1]}")
