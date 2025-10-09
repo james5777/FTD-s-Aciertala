@@ -300,4 +300,3 @@ def reporte_diario_aciertala():
 if __name__ == "__main__":
     ad.data_auto_descarga()
     reporte_diario_aciertala()
-    reporte_diario_aciertala()
