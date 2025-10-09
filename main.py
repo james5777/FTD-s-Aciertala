@@ -44,7 +44,7 @@ def reporte_diario_aciertala():
     tipo_transaccion_csv = 'Tipo de transacción'
     ID_transaccion_csv = 'ID de transacción'
 
-
+    
 
     ### ---------- Conexión a SQLite ---------- ###
     conn = sqlite3.connect(archivo_base_datos)
@@ -166,15 +166,15 @@ def reporte_diario_aciertala():
         ID_transaccion_csv: "ID primer depósito"
     })
 
-    final_cols = [fecha_creacion_excel, ID_usuario_excel, Usuario_excel, fecha_deposito_csv, ID_transaccion_csv]
+    final_cols = ["Fecha de registro", ID_usuario_excel, Usuario_excel, "Fecha primer depósito", "ID primer depósito"]
     final_cols = [c for c in final_cols if c in df_resultado.columns]
     df_resultado = df_resultado[final_cols]
 
     # Asegurar que las fechas estén en el formato correcto para guardar en SQLite
-    if fecha_creacion_excel in df_resultado.columns:
-        df_resultado[fecha_creacion_excel] = pd.to_datetime(df_resultado[fecha_creacion_excel], errors="coerce").dt.strftime("%Y-%m-%d")
-    if fecha_deposito_csv in df_resultado.columns:
-        df_resultado[fecha_deposito_csv] = pd.to_datetime(df_resultado[fecha_deposito_csv], errors="coerce").dt.strftime("%Y-%m-%d")
+    if "Fecha de registro" in df_resultado.columns:
+        df_resultado["Fecha de registro"] = pd.to_datetime(df_resultado["Fecha de registro"], errors="coerce").dt.strftime("%Y-%m-%d")
+    if "Fecha primer depósito" in df_resultado.columns:
+        df_resultado["Fecha primer depósito"] = pd.to_datetime(df_resultado["Fecha primer depósito"], errors="coerce").dt.strftime("%Y-%m-%d")
 
     ### ---------- Guardar en SQLite ---------- ###
     def guardar_en_sqlite(df, nombre_tabla, archivo_db, if_exists="replace"):
@@ -299,4 +299,5 @@ def reporte_diario_aciertala():
 
 if __name__ == "__main__":
     ad.data_auto_descarga()
+    reporte_diario_aciertala()
     reporte_diario_aciertala()
