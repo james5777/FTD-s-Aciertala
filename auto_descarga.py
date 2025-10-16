@@ -18,7 +18,7 @@ def data_auto_descarga():
     # === 📅 CONFIGURACIÓN DE FECHAS ===
     # Puedes editar estas variables para ajustar el rango
     FECHA_INICIO = "2025-10-14 00:00"
-    FECHA_FIN =    "2025-10-14 23:59"
+    FECHA_FIN =    "2025-10-15 23:59"
 
     # Carpeta donde se descargará el CSV
     DOWNLOAD_DIR = os.path.join(os.getcwd(), "Archivos")
