@@ -59,12 +59,12 @@ def analisis_comparativo(df):
     '''Realiza y visualiza la comparación entre 2024 y 2025.'''
     print("\nIniciando análisis comparativo...")
     # Segmentar datos
-    periodo_2024 = df['2024-03-01':'2024-09-30']
+    periodo_2024 = df['2024-01-01':'2025-02-28']
     periodo_2025 = df['2025-03-01':'2025-09-30']
 
     # Calcular KPIs
     kpis = {}
-    for year, data in [('2024', periodo_2024), ('2025', periodo_2025)]:
+    for year, data in [('Ene 2024 - Feb 2025', periodo_2024), ('Mar 2025 - Sep 2025', periodo_2025)]:
         total_registros = data['Registros'].sum()
         total_depositos = data['Primeros Depósitos'].sum()
         conversion_rate = (total_depositos / total_registros * 100) if total_registros > 0 else 0
@@ -80,7 +80,7 @@ def analisis_comparativo(df):
 
     # Visualización 1: Gráfico de Barras de Totales
     df_kpis[['Total Registros', 'Total Primeros Depósitos']].plot(kind='bar', rot=0)
-    plt.title('Comparación de Totales (Marzo-Septiembre): 2024 vs 2025', fontsize=16, weight='bold')
+    plt.title('Comparación de Totales (Ene 2024 - Feb 2025) vs (Mar 2025 - Sep 2025)', fontsize=16, weight='bold')
     plt.ylabel('Cantidad Total')
     plt.xlabel('Año')
     plt.tight_layout()
@@ -155,8 +155,5 @@ if __name__ == "__main__":
         # Realizar el análisis comparativo
         analisis_comparativo(df_principal)
         
-        # Realizar las proyecciones para los próximos 3 meses
-        realizar_proyeccion(df_principal, 'Registros', n_meses=3)
-        realizar_proyeccion(df_principal, 'Primeros Depósitos', n_meses=3)
         
         print("\nAnálisis y proyección finalizados con éxito.")

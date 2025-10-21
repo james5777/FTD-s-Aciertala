@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 import warnings
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import seaborn as sns
 
 warnings.filterwarnings("ignore")
@@ -17,7 +18,7 @@ warnings.filterwarnings("ignore")
 # -------------------------------
 # CONFIGURACIÓN
 # -------------------------------
-db_path = Path("Archivos/Archivos_base_datos/DataBase_aciertala.db")
+db_path = Path("Archivos/Archivos_base_datos/copy_jaco.db")
 tabla_resumen = "tabla_resumen_diario"
 
 sns.set_theme(style="whitegrid")
@@ -40,15 +41,27 @@ df = cargar_datos(db_path, tabla_resumen)
 # -------------------------------
 # 2. SEGMENTACIÓN DE PERÍODOS
 # -------------------------------
-periodo_2024 = df["2024-03-01":"2024-09-30"]
-periodo_2025 = df["2025-01-01":"2025-09-30"]
+periodo_2024 = df["2024-01":"2024-12"].drop(columns=["mes_año"])
+periodo_2025_enero = df["2025-01":"2025-03"].drop(columns=["mes_año"])
+periodo_2025_marzo = df["2025-03":"2025-12"].drop(columns=["mes_año"])
+periodo_sin_quota = df["2024-01":"2025-02"].drop(columns=["mes_año"])
+
+inversion = pd.DataFrame({
+    "Mes": ["2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-08", "2024-09"],
+    "Dollar": [4923, 9676, 10962, 8197, 9881, 9095, 9644]
+})
+
+inversion["Mes"] = pd.to_datetime(inversion["Mes"], format="%Y-%m")
+inversion["Dollar"] = inversion["Dollar"]
+
 
 # -------------------------------
 # 3. CÁLCULO DE KPIs
 # -------------------------------
-def calcular_kpis(data):
-    total_reg = data["Registros"].sum()
-    total_dep = data["Primeros Depósitos"].sum()
+def calcular_kpis(data, num_meses):
+    print(data.head())
+    total_reg = data["Registros"].sum() / num_meses
+    total_dep = data["Primeros Depósitos"].sum() / num_meses
     tasa_conv = (total_dep / total_reg * 100) if total_reg > 0 else 0
     promedio_mensual = data.resample("M").sum().mean()
     return {
@@ -59,8 +72,12 @@ def calcular_kpis(data):
         "Promedio mensual depósitos": promedio_mensual["Primeros Depósitos"]
     }
 
-kpi_2024 = calcular_kpis(periodo_2024)
-kpi_2025 = calcular_kpis(periodo_2025)
+
+kpi_2024 = calcular_kpis(periodo_sin_quota, 14)
+kpi_2025 = calcular_kpis(periodo_2025_marzo, 7)
+
+kk2024 = calcular_kpis(periodo_sin_quota, 1)
+kk2025 = calcular_kpis(periodo_2025_marzo, 1)
 
 # -------------------------------
 # 4. RESUMEN COMPARATIVO
@@ -86,7 +103,11 @@ def resumen_comparativo(kpi_2024, kpi_2025):
     })
     return comparativo
 
+# print("\n--- RESUMEN COMPARATIVO PROMEDIO---")
 resumen = resumen_comparativo(kpi_2024, kpi_2025)
+
+# print("\n--- RESUMEN COMPARATIVO ABSOLUTO---")
+resumen_abso = resumen_comparativo(kk2024, kk2025)
 
 # -------------------------------
 # 5. PRUEBAS DE SIGNIFICANCIA
@@ -113,21 +134,45 @@ def pruebas_significancia(p24, p25):
 
     return {"p_reg": p_reg, "p_dep": p_dep, "p_z": p_z}
 
-p_vals = pruebas_significancia(periodo_2024, periodo_2025)
+p_vals = pruebas_significancia(periodo_sin_quota, periodo_2025_marzo)
 
 # -------------------------------
 # 6. VISUALIZACIÓN RÁPIDA
 # -------------------------------
-def graficos_basicos(p24, p25):
+def graficos_basicos(p24, p25, pqu):
     resumen_mensual_24 = p24.resample("M").sum()
-    resumen_mensual_25 = p25.resample("M").sum()
+    resumen_mensual_245 = p25.resample("M").sum()
+    resumen_mensual_25 = pqu.resample("M").sum()
     
     plt.figure()
     # plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Registros"], label="Registros 2024", linestyle="--", marker="o")
     # plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Registros"], label="Registros 2025", marker="o")
-    plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Primeros Depósitos"], label="Depósitos 2024", linestyle="--", marker="x")
-    plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Primeros Depósitos"], label="Depósitos 2025", marker="x")
-    plt.xticks(range(3,10), ["Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"])
+    plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Primeros Depósitos"], label="Depósitos 2024", linestyle="--", marker="x", color="orange")
+    plt.plot(resumen_mensual_245.index.month, resumen_mensual_245["Primeros Depósitos"], label="Depósitos 2025 sin Quota Media", marker="x", color="orange")
+    plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Primeros Depósitos"], label="Depósitos 2025 con Quota Media", marker="o")
+    plt.xticks(range(0,13), [".", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
+    # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b')),
+    plt.title("Comparación mensual de primeros depósitos 2024 vs 2025")
+    plt.xlabel("Mes")
+    plt.ylabel("Cantidad")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("comparacion_mensual_FTD.png")
+
+
+def graficos_basicos_registros(p24, p25, pqu):
+    resumen_mensual_24 = p24.resample("M").sum()
+    resumen_mensual_245 = p25.resample("M").sum()
+    resumen_mensual_25 = pqu.resample("M").sum()
+    
+    plt.figure()
+    plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Registros"], label="Registros 2024", linestyle="--", marker="x", color="orange")
+    plt.plot(resumen_mensual_245.index.month, resumen_mensual_245["Registros"], label="Registros 2025 sin Quota Media", marker="x", color="orange")
+    plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Registros"], label="Registros 2025 con Quota Media", marker="o")
+    # plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Primeros Depósitos"], label="Depósitos 2024", linestyle="--", marker="x")
+    # plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Primeros Depósitos"], label="Depósitos 2025", marker="x")
+    plt.xticks(range(0,13), [".", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
+    # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b')),
     plt.title("Comparación mensual 2024 vs 2025")
     plt.xlabel("Mes")
     plt.ylabel("Cantidad")
@@ -135,12 +180,151 @@ def graficos_basicos(p24, p25):
     plt.tight_layout()
     plt.savefig("comparacion_mensual_registros.png")
 
+# def graficos_basicos_inversion(p24, p25, pqu, inverss):
+
+#     inverss = inverss.set_index("Mes")
+
+#     # resumen_mensual_24 = p24.resample("M").sum()
+#     # resumen_mensual_245 = p25.resample("M").sum()
+#     resumen_mensual_25 = pqu.resample("M").sum()
+#     resumen_mensual_inversion = inverss.resample("M").sum()
+
+#     plt.figure()
+#     # plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Registros"], label="Registros 2024", linestyle="--", marker="x", color="orange")
+#     # plt.plot(resumen_mensual_245.index.month, resumen_mensual_245["Registros"], label="Registros 2025 sin Quota Media", marker="x", color="orange")
+#     plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Registros"], label="Registros 2025 con Quota Media", marker="o")
+#     plt.plot(resumen_mensual_inversion.index.month, resumen_mensual_inversion["Dollar"], label="Inversion con Quota Media", linestyle="--", marker="x", color="red")
+#     # plt.plot(resumen_mensual_24.index.month, resumen_mensual_24["Primeros Depósitos"], label="Depósitos 2024", linestyle="--", marker="x")
+#     # plt.plot(resumen_mensual_25.index.month, resumen_mensual_25["Primeros Depósitos"], label="Depósitos 2025", marker="x")
+#     plt.xticks(range(0,13), [".", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
+#     # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b')),
+#     plt.title("Comparación mensual 2024 vs 2025")
+#     plt.xlabel("Mes")
+#     plt.ylabel("Cantidad")
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.savefig("comparacion_mensual_inversi'on.png")
+
+
+def graficos_basicos_inversion(p24, p25, pqu, inverss):
+    """
+    Grafica la comparación mensual de registros (eje izquierdo)
+    y la inversión en dólares (eje derecho, escalada a 1/4).
+    """
+
+    # --- Preparación de datos ---
+    inverss = inverss.set_index("Mes")
+    resumen_mensual_25 = pqu.resample("M").sum()
+    resumen_mensual_inversion = inverss.resample("M").sum()
+
+    # --- Crear figura y eje principal ---
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # --- Eje 1: Registros (izquierda) ---
+    ax1.plot(
+        resumen_mensual_25.index.month,
+        resumen_mensual_25["Registros"],
+        label="Registros 2025 con Quota Media",
+        marker="o",
+        color="blue"
+    )
+    ax1.set_xlabel("Mes")
+    ax1.set_ylabel("Cantidad de Registros", color="blue")
+    ax1.tick_params(axis="y", labelcolor="blue")
+    ax1.set_xticks(range(1, 13))
+    ax1.set_xticklabels(["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])
+
+    # --- Eje 2: Inversión (derecha) ---
+    ax2 = ax1.twinx()  # crea el eje secundario
+    ax2.plot(
+        resumen_mensual_inversion.index.month,
+        resumen_mensual_inversion["Dollar"],  # Escala la inversión
+        label="Inversión (USD)",
+        linestyle="--",
+        marker="x",
+        color="red"
+    )
+    ax2.set_ylabel("Inversión (USD)", color="red")
+    ax2.tick_params(axis="y", labelcolor="red")
+
+    # --- Título y leyenda combinada ---
+    fig.suptitle("Comparación Mensual: Registros vs Inversión", fontsize=15, weight="bold")
+    
+    # Combinar leyendas de ambos ejes
+    lines_1, labels_1 = ax1.get_legend_handles_labels()
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper right")
+
+    plt.tight_layout()
+    plt.savefig("comparacion_mensual_inversion.png")
+    plt.close()
+
+    print("Gráfico 'comparacion_mensual_inversion.png' guardado correctamente.")
+
+# def graficos_basicos_inversion(p24, p25, pqu, inverss, escala_inversion=0.25):
+#     """
+#     Grafica la comparación mensual de registros (eje izquierdo)
+#     y la inversión en dólares (eje derecho, escalada visualmente).
+#     """
+
+#     # --- Preparación de datos ---
+#     inverss = inverss.set_index("Mes")
+#     resumen_mensual_25 = pqu.resample("M").sum()
+#     resumen_mensual_inversion = inverss.resample("M").sum()
+
+#     # --- Crear figura y eje principal ---
+#     fig, ax1 = plt.subplots(figsize=(10, 6))
+
+#     # --- Eje 1: Registros (izquierda) ---
+#     ax1.plot(
+#         resumen_mensual_25.index.month,
+#         resumen_mensual_25["Registros"],
+#         label="Registros 2025 con Quota Media",
+#         marker="o",
+#         color="blue"
+#     )
+#     ax1.set_xlabel("Mes")
+#     ax1.set_ylabel("Cantidad de Registros", color="blue")
+#     ax1.tick_params(axis="y", labelcolor="blue")
+#     ax1.set_xticks(range(1, 13))
+#     ax1.set_xticklabels(["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul",
+#                          "Ago", "Sep", "Oct", "Nov", "Dic"])
+
+#     # --- Eje 2: Inversión (derecha) ---
+#     ax2 = ax1.twinx()
+#     ax2.plot(
+#         resumen_mensual_inversion.index.month,
+#         resumen_mensual_inversion["Dollar"] * escala_inversion,  # Escala visual
+#         label=f"Inversión (USD, x{escala_inversion})",
+#         linestyle="--",
+#         marker="x",
+#         color="red"
+#     )
+#     ax2.set_ylabel("Inversión (USD)", color="red")
+#     ax2.tick_params(axis="y", labelcolor="red")
+
+#     # --- Ajuste de límites opcional para no superponer ---
+#     ax1.set_ylim(bottom=0)
+#     ax2.set_ylim(bottom=0)
+
+#     # --- Título y leyenda combinada ---
+#     fig.suptitle("Comparación Mensual: Registros vs Inversión", fontsize=15, weight="bold")
+#     lines_1, labels_1 = ax1.get_legend_handles_labels()
+#     lines_2, labels_2 = ax2.get_legend_handles_labels()
+#     ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper right")
+
+#     plt.tight_layout()
+#     plt.savefig("comparacion_mensual_inversion.png")
+#     plt.close()
+
+#     print("Gráfico 'comparacion_mensual_inversion.png' guardado correctamente.")
+
 # graficos_basicos(periodo_2024, periodo_2025)  # <- Descomenta si quieres el gráfico
 
 # -------------------------------
 # 7. IMPRESIÓN DE RESULTADOS
 # -------------------------------
-print("\n================ RESULTADOS CLAVE ================\n")
+print("\n================ RESULTADOS CLAVE PROMEDIO ================\n")
 print(resumen.to_string(index=False))
 
 # Interpretaciones automáticas
@@ -156,11 +340,85 @@ if resumen.loc[2, 'Cambio absoluto'] < 0:
 if p_vals["p_reg"] < 0.05:
     print("• Diferencia significativa en registros (p < 0.05).")
 if p_vals["p_dep"] < 0.05:
-    print("• Diferencia significativa en depósitos (p < 0.05).")
+    print("• Diferencia signficativa en depósitos (p < 0.05).")
+if p_vals["p_z"] < 0.05:
+    print("• Diferencia significativa en tasa de conversión (p < 0.05).")
+
+print("\n==================================================\n")
+
+
+
+print("\n================ RESULTADOS CLAVE ABSOLUTOS================\n")
+print(resumen_abso.to_string(index=False))
+
+# Interpretaciones automáticas
+print("\n--- INTERPRETACIÓN ---")
+if resumen_abso.loc[0, "Cambio %"] > 0:
+    print(f"• Los registros crecieron {resumen_abso.loc[0, 'Cambio %']:.1f}% respecto al 2024.")
+if resumen_abso.loc[1, "Cambio %"] > 0:
+    print(f"• Los primeros depósitos crecieron {resumen_abso.loc[1, 'Cambio %']:.1f}% respecto al 2024.")
+if resumen_abso.loc[2, 'Cambio absoluto'] < 0:
+    print(f"• La tasa de conversión disminuyó {abs(resumen_abso.loc[2, 'Cambio absoluto']):.2f} puntos porcentuales.")
+
+# Significancia
+if p_vals["p_reg"] < 0.05:
+    print("• Diferencia significativa en registros (p < 0.05).")
+if p_vals["p_dep"] < 0.05:
+    print("• Diferencia signficativa en depósitos (p < 0.05).")
 if p_vals["p_z"] < 0.05:
     print("• Diferencia significativa en tasa de conversión (p < 0.05).")
 
 print("\n==================================================\n")
 print("Análisis completado. Puedes usar estos resultados en tu presentación.")
 
-graficos_basicos(periodo_2024, periodo_2025)
+graficos_basicos(periodo_2024, periodo_2025_enero, periodo_2025_marzo)
+graficos_basicos_registros(periodo_2024, periodo_2025_enero, periodo_2025_marzo)
+
+graficos_basicos_inversion(periodo_2024, periodo_2025_enero, periodo_2025_marzo, inversion)
+
+
+# def graficos_basicos_registros_con_inversion(p24, p25, pqu, inversion):
+#     # Asegurar formato de fecha mensual
+#     inversion["Mes"] = pd.to_datetime(inversion["Mes"], format="%Y-%m")
+
+#     # Agrupar por mes
+#     resumen_mensual_24 = p24.resample("M").sum()
+#     resumen_mensual_245 = p25.resample("M").sum()
+#     resumen_mensual_25 = pqu.resample("M").sum()
+
+#     # Crear figura
+#     fig, ax1 = plt.subplots(figsize=(8,5))
+
+#     # Series de registros
+#     ax1.plot(resumen_mensual_24.index, resumen_mensual_24["Registros"],
+#              label="Registros 2024", linestyle="--", marker="x", color="orange")
+#     ax1.plot(resumen_mensual_245.index, resumen_mensual_245["Registros"],
+#              label="Registros 2025 sin Quota Media", marker="x", color="darkorange")
+#     ax1.plot(resumen_mensual_25.index, resumen_mensual_25["Registros"],
+#              label="Registros 2025 con Quota Media", marker="o", color="blue")
+
+#     # Segundo eje Y para inversión
+#     ax2 = ax1.twinx()
+#     ax2.plot(inversion["Mes"], inversion["Inversión"], color="red", marker="s",
+#              linewidth=2, label="Inversión (COP)")
+
+#     # Etiquetas y formato
+#     ax1.set_xticks(resumen_mensual_25.index)
+#     ax1.set_xticklabels([x.strftime("%b") for x in resumen_mensual_25.index])
+#     ax1.set_xlabel("Mes")
+#     ax1.set_ylabel("Registros", color="black")
+#     ax2.set_ylabel("Inversión (COP)", color="red")
+
+#     # Leyendas combinadas
+#     lines, labels = ax1.get_legend_handles_labels()
+#     lines2, labels2 = ax2.get_legend_handles_labels()
+#     ax1.legend(lines + lines2, labels + labels2, loc="upper left")
+
+#     plt.title("Comparación mensual de registros e inversión")
+#     plt.tight_layout()
+#     plt.savefig("comparacion_mensual_registros_inversion.png")
+#     plt.show()
+
+
+# graficos_basicos_registros_con_inversion(periodo_2024, periodo_2025_enero, periodo_2025_marzo, inversion)
+# graficos_basicos_registros_con_inversion(periodo_2024, periodo_2025_enero, periodo_2025_marzo, inversion)
